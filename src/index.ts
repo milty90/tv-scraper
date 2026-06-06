@@ -24,7 +24,7 @@ interface Channel {
 
 let uniqueChannels: Channel[] = [];
 let lastScrapeTime = 0;
-const SCRAPE_INTERVAL = 30 * 60 * 1000;
+const SCRAPE_INTERVAL = 10 * 10 * 1000;
 
 async function scrapeTvMovie() {
   console.log("Starte Scraping von TV Movie...");
@@ -169,7 +169,7 @@ async function scrapeTvMovie() {
           Ende: timeMatch[2],
           Kategorie: kategorie || genre,
           Link: `https://www.tvmovie.de${href}`,
-          Thumbnail: thumbnail,
+          Thumbnail: thumbnail.replace(",w=60,", ",w=500,"),
         };
 
         const channel = channelMap.get(currentKanal);
