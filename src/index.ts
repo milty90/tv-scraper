@@ -87,7 +87,7 @@ async function scrapeTvMovie() {
 
     await page.waitForTimeout(2000);
 
-    // "Mehr laden" gomb kattintgatása amíg el nem tűnik
+    // "Mehr laden" knopf so lange klicken, bis er nicht mehr sichtbar ist oder max 12 Klicks erreicht sind
     let loadMoreCount = 0;
     while (true) {
       const mehrLadenBtn = page
@@ -109,8 +109,8 @@ async function scrapeTvMovie() {
       console.log(`"Mehr laden" geklickt: ${loadMoreCount}x`);
       await page.waitForTimeout(2000);
 
-      // Max 20 kattintás biztonsági limit
-      if (loadMoreCount >= 20) {
+      // Max 12 clicks nach dem es wahrscheinlich keine neuen Inhalte mehr gibt
+      if (loadMoreCount >= 12) {
         console.log("Maximale Klick-Anzahl erreicht.");
         break;
       }
