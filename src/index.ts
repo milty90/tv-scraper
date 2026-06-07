@@ -7,12 +7,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 interface Broadcast {
-  Sendung: string;
-  Beginn: string;
-  Ende: string;
-  Kategorie: string;
+  Program: string;
+  Start: string;
+  End: string;
+  Category: string;
   Link: string;
   Thumbnail: string;
+  Progress: number;
 }
 
 interface Channel {
@@ -51,7 +52,7 @@ async function scrapeTvMovie() {
 
   const page = await context.newPage();
 
-  // Képek és fontok blokkolása - gyorsabb betöltés
+  // unnötige res. blockieren (jpg, woff , pdf)
   await page.route("**/*.{png,jpg,jpeg,gif,svg,woff,woff2,pdf}", (route) =>
     route.abort(),
   );
@@ -64,16 +65,16 @@ async function scrapeTvMovie() {
 
     await page.waitForTimeout(3000);
 
-    // Cookie banner elfogadása
+    // cookie banner akzeptieren oder entfernen
     try {
       const iframe = page.frameLocator('iframe[title="SP Consent Message"]');
       await iframe
         .getByRole("button", { name: "Akzeptieren" })
         .click({ timeout: 8000 });
       await page.waitForTimeout(3000);
-      console.log("Cookie akzeptiert.");
+      console.log("cookie akzeptiert.");
     } catch {
-      // Banner eltávolítása JS-sel ha az iframe nem működik
+      // banner mit js entfernen, falls das iframe nicht funktioniert
       await page.evaluate(() => {
         document.documentElement.classList.remove("sp-message-open");
         document.body.style.overflow = "auto";
@@ -82,12 +83,12 @@ async function scrapeTvMovie() {
         );
         overlays.forEach((el) => el.remove());
       });
-      console.log("Banner JS-sel entfernt.");
+      console.log("banner mit js entfernt.");
     }
 
     await page.waitForTimeout(2000);
 
-    // "Mehr laden" knopf so lange klicken, bis er nicht mehr sichtbar ist oder max 12 Klicks erreicht sind
+    // "mehr laden" knopf so lange klicken, bis er nicht mehr sichtbar ist oder max 12 mal
     let loadMoreCount = 0;
     while (true) {
       const mehrLadenBtn = page
@@ -98,7 +99,7 @@ async function scrapeTvMovie() {
 
       if (!(await mehrLadenBtn.isVisible())) {
         console.log(
-          `"Mehr laden" nicht mehr sichtbar nach ${loadMoreCount} Klicks.`,
+          `"mehr laden" nicht mehr sichtbar nach ${loadMoreCount} Klicks.`,
         );
         break;
       }
@@ -106,29 +107,29 @@ async function scrapeTvMovie() {
       await mehrLadenBtn.scrollIntoViewIfNeeded();
       await mehrLadenBtn.click();
       loadMoreCount++;
-      console.log(`"Mehr laden" geklickt: ${loadMoreCount}x`);
+      console.log(`"mehr laden" geclickt: ${loadMoreCount}x`);
       await page.waitForTimeout(2000);
 
-      // Max 12 clicks nach dem es wahrscheinlich keine neuen Inhalte mehr gibt
+      // max 12 clicks
       if (loadMoreCount >= 12) {
-        console.log("Maximale Klick-Anzahl erreicht.");
+        console.log("maximale click anzahl erreicht.");
         break;
       }
     }
 
-    // Teljes HTML kinyerése
+    // inhalt der seite holen und mit cherio parsen
     const html = await page.content();
     const $ = cheerio.load(html);
 
     let currentKanal = "N/A";
-    let currentKanalLogo = ""; // ← új változó a logó URL-jének tárolására
+    let currentKanalLogo = ""; // logokanal
 
     const channelMap = new Map<string, Channel>();
 
     $("a").each((_, el) => {
       const href = $(el).attr("href") || "";
 
-      // Csatorna
+      // kanal
       if ($(el).hasClass("bx-epg-channel")) {
         currentKanal = $(el).find("span").first().text().trim();
         currentKanalLogo = $(el).find("img").attr("src") || "";
@@ -144,14 +145,19 @@ async function scrapeTvMovie() {
         return;
       }
 
-      // Műsor
+      // sendung
       if ($(el).hasClass("bx-epg-broadcast")) {
         const thumbnail = $(el).find("img").attr("src") || "";
         const title = $(el).attr("aria-label") || "";
 
         const spans = $(el).find("div").first().find("span");
         const genre = $(spans[0]).text().trim();
-        const kategorie = $(spans[1]).text().trim();
+        const category = $(spans[1]).text().trim();
+
+        const progressStyle =
+          $(el).find("div[style*='width']").attr("style") || "";
+        const progressMatch = progressStyle.match(/width:\s*([\d.]+)%/);
+        const progress = progressMatch ? parseFloat(progressMatch[1]) : 0;
 
         const timeText = $(el)
           .find("span")
@@ -164,26 +170,27 @@ async function scrapeTvMovie() {
         if (!timeMatch || !title) return;
 
         const broadcast: Broadcast = {
-          Sendung: title,
-          Beginn: timeMatch[1],
-          Ende: timeMatch[2],
-          Kategorie: kategorie || genre,
+          Program: title,
+          Start: timeMatch[1],
+          End: timeMatch[2],
+          Category: category || genre,
           Link: `https://www.tvmovie.de${href}`,
           Thumbnail: thumbnail.replace(",w=60,", ",w=500,"),
+          Progress: Math.round(progress),
         };
 
         const channel = channelMap.get(currentKanal);
         if (channel) {
           if (!channel.now) {
-            channel.now = broadcast; // első műsor = now
+            channel.now = broadcast; // erste sendung = now
           } else if (!channel.after) {
-            channel.after = broadcast; // második műsor = after
+            channel.after = broadcast; // zweite sendung = after
           }
         }
       }
     });
 
-    // Map -> Array
+    // map -> array
     const results = Array.from(channelMap.values());
     console.log(`Gefunden: ${results.length} Kanäle`);
     return results;
