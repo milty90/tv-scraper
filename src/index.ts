@@ -30,7 +30,7 @@ const SCRAPE_INTERVAL = 10 * 10 * 1000;
 
 async function scrapeTvMovie() {
   console.log("Starte Scraping von TV Movie...");
-  if (isScraping) return; // ← ez már megvan
+  if (isScraping) return undefined; // falls schon am scrapen, nichts tun
   isScraping = true; // ← ezt tedd AZONNAL ide, ne később!
 
   const now = Date.now();
@@ -203,7 +203,7 @@ async function scrapeTvMovie() {
     console.error("Fehler:", err);
     return [];
   } finally {
-    await context.close();
+    isScraping = false;
     await browser.close();
   }
 }
@@ -213,14 +213,15 @@ app.use(cors());
 app.get("/", async (req, res) => {
   if (!uniqueChannels.length || Date.now() - lastScrapeTime > SCRAPE_INTERVAL) {
     if (!isScraping) {
-      isScraping = true;
-      uniqueChannels = await scrapeTvMovie();
+      const result = await scrapeTvMovie();
+      uniqueChannels = result ?? [];
       isScraping = false;
+      lastScrapeTime = Date.now();
+    } else {
       while (isScraping) {
         await new Promise((r) => setTimeout(r, 500));
       }
     }
-    lastScrapeTime = Date.now();
   }
 
   const q = (req.query.q || "").toString().toLowerCase();
