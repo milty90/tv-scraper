@@ -25,10 +25,15 @@ interface Channel {
 
 let uniqueChannels: Channel[] = [];
 let lastScrapeTime = 0;
+let isScraping = false;
 const SCRAPE_INTERVAL = 10 * 10 * 1000;
 
 async function scrapeTvMovie() {
   console.log("Starte Scraping von TV Movie...");
+  if (isScraping) return; // ← ez már megvan
+  isScraping = true; // ← ezt tedd AZONNAL ide, ne később!
+
+  const now = Date.now();
 
   const browser = await chromium.launch({
     headless: true,
@@ -207,7 +212,14 @@ app.use(cors());
 
 app.get("/", async (req, res) => {
   if (!uniqueChannels.length || Date.now() - lastScrapeTime > SCRAPE_INTERVAL) {
-    uniqueChannels = await scrapeTvMovie();
+    if (!isScraping) {
+      isScraping = true;
+      uniqueChannels = await scrapeTvMovie();
+      isScraping = false;
+      while (isScraping) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
     lastScrapeTime = Date.now();
   }
 
