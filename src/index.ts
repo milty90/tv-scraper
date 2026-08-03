@@ -30,9 +30,8 @@ const SCRAPE_INTERVAL = 10 * 10 * 1000;
 
 async function scrapeTvMovie() {
   console.log("Starte Scraping von TV Movie...");
-  if (isScraping) return undefined; // falls schon am scrapen, nichts tun
-  isScraping = true; // ← ezt tedd AZONNAL ide, ne később!
-
+  if (isScraping) return undefined;
+  isScraping = true;
   const now = Date.now();
 
   const browser = await chromium.launch({
@@ -57,7 +56,7 @@ async function scrapeTvMovie() {
 
   const page = await context.newPage();
 
-  // unnötige res. blockieren (jpg, woff , pdf)
+  // unnötige res. blockieren
   await page.route("**/*.{png,jpg,jpeg,gif,svg,woff,woff2,pdf}", (route) =>
     route.abort(),
   );
@@ -79,7 +78,7 @@ async function scrapeTvMovie() {
       await page.waitForTimeout(3000);
       console.log("cookie akzeptiert.");
     } catch {
-      // banner mit js entfernen, falls das iframe nicht funktioniert
+      // banner mit js entfernen
       await page.evaluate(() => {
         document.documentElement.classList.remove("sp-message-open");
         document.body.style.overflow = "auto";
@@ -93,7 +92,7 @@ async function scrapeTvMovie() {
 
     await page.waitForTimeout(2000);
 
-    // "mehr laden" knopf so lange klicken, bis er nicht mehr sichtbar ist oder max 12 mal
+    // "mehr laden" knopf klicken
     let loadMoreCount = 0;
     while (true) {
       const mehrLadenBtn = page
@@ -122,7 +121,7 @@ async function scrapeTvMovie() {
       }
     }
 
-    // inhalt der seite holen und mit cherio parsen
+    // inhalt der seite holen
     const html = await page.content();
     const $ = cheerio.load(html);
 
@@ -187,9 +186,9 @@ async function scrapeTvMovie() {
         const channel = channelMap.get(currentKanal);
         if (channel) {
           if (!channel.now) {
-            channel.now = broadcast; // erste sendung = now
+            channel.now = broadcast; // erste sendung
           } else if (!channel.after) {
-            channel.after = broadcast; // zweite sendung = after
+            channel.after = broadcast; // zweite sendung
           }
         }
       }
